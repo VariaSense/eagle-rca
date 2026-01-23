@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  incident-rca-agent:
+    container_name: incident-rca-agent
+    build: .
+    image: incident-rca/agent:latest
+    environment:
+      PLATFORM_API_URL: http://host.docker.internal:8000/api/v1
+      AGENT_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NjU3NWU2MS00YTRjLTRjOWUtYjNiNS05NjdmMjA5MDdkZDgiLCJvcmdfaWQiOiI3ZTdlZDNhNS0yMzFlLTRjYzQtODY2Mi1lMmQyNGFjYjczY2EiLCJzeXN0ZW1fdHlwZSI6ImRhdGFjZW50ZXIiLCJ0eXBlIjoiYWdlbnQiLCJleHAiOjE4MDA2NjY5MzIsImlhdCI6MTc2OTEzMDkzMn0.K8jIxSZqwLkiLtj0OtYvh_TvCfc9uNVe1FSYG3qeC_A"
+      HEARTBEAT_INTERVAL: 30
+      COLLECT_SYSTEM_STATS: "true"
+      COMMAND_TIMEOUT: 60
+      MAX_OUTPUT_CHARS: 20000
+      SSL_VERIFY: "true"
