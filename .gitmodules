@@ -1,0 +1,6 @@
+[submodule "platform"]
+	path = platform
+	url = https://github.com/VariaSense/platform.git
+[submodule "connectors"]
+	path = connectors
+	url = https://github.com/VariaSense/connectors.git
