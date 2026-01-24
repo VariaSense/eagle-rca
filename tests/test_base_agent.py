@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import requests
-from connectors.core.base_agent import BaseAgent
+from sdk.core.base_agent import BaseAgent
 
 
 class ConcreteAgent(BaseAgent):
