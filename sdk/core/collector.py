@@ -65,3 +65,7 @@ def load_collector(spec: Any) -> BaseCollector:
 
 def available_collectors() -> Dict[str, Type[BaseCollector]]:
     return dict(_REGISTRY)
+
+
+def available_collector_names() -> list[str]:
+    return sorted(_REGISTRY.keys())
