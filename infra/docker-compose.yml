@@ -1,0 +1,244 @@
+version: '3.8'
+name: eagle
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: cluster_user
+      POSTGRES_PASSWORD: cluster_password
+      POSTGRES_DB: cluster_agent
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cluster_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cluster-network
+
+  # Redis (Standalone)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --requirepass redis_password --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cluster-network
+
+  # Elasticsearch (Single node)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cluster-network
+
+  # Kibana (Log search UI for Elasticsearch)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_SECURITYRESPONSEHEADERS_DISABLEEMBEDDING: "false"
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - cluster-network
+
+  # Backend API
+  backend-server:
+    build:
+      context: ../eagle-server
+      dockerfile: Dockerfile.backend
+    container_name: backend-server
+    env_file:
+      - ../eagle-server/.env
+    environment:
+      DATABASE_URL: postgresql://cluster_user:cluster_password@postgres:5432/cluster_agent
+      REDIS_NODES: redis:6379
+      REDIS_PASSWORD: redis_password
+      CELERY_BROKER_URL: redis://:redis_password@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:redis_password@redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: "true"
+      PROMETHEUS_ENABLED: "true"
+      FF_ELASTICSEARCH: "true"
+      FF_REDIS_CLUSTER: "false"
+      FF_PROMETHEUS: "true"
+      ENVIRONMENT: development
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost"
+      PLUGIN_STORAGE_DIR: /app/storage/plugins
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ../eagle-server/app:/app/app
+      - ../eagle-server/requirements.txt:/app/requirements.txt
+      - ../eagle-ui-sdk:/app/ui-sdk:ro
+      - ../eagle-server-sdk:/app/platform-sdk:ro
+      - ../eagle-server/storage/plugins:/app/storage/plugins
+    command: >
+      bash -c "
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    networks:
+      - cluster-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-worker:
+    build:
+      context: ../eagle-server
+      dockerfile: Dockerfile.backend
+    container_name: backend-worker
+    env_file:
+      - ../eagle-server/.env
+    environment:
+      DATABASE_URL: postgresql://cluster_user:cluster_password@postgres:5432/cluster_agent
+      REDIS_NODES: redis:6379
+      REDIS_PASSWORD: redis_password
+      CELERY_BROKER_URL: redis://:redis_password@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:redis_password@redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: "true"
+      ENVIRONMENT: development
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ../eagle-server/app:/app/app
+      - ../eagle-server/requirements.txt:/app/requirements.txt
+      - ../eagle-server-sdk:/app/platform-sdk:ro
+    command: >
+      bash -c "
+        celery -A app.services.celery_tasks.celery_app worker -l info
+      "
+    networks:
+      - cluster-network
+
+  # Frontend (Vite dev server)
+  frontend:
+    build:
+      context: ../eagle-ui
+      dockerfile: Dockerfile.dev
+    container_name: frontend
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+      VITE_WS_URL: ws://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend-server
+    volumes:
+      - ../eagle-ui:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - cluster-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../eagle-server/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend-server
+    networks:
+      - cluster-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_INSTALL_PLUGINS: "redis-datasource"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../eagle-server/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    depends_on:
+      - prometheus
+    networks:
+      - cluster-network
+
+  # NGINX Reverse Proxy (optional, for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../eagle-server/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend-server
+      - frontend
+    networks:
+      - cluster-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  cluster-network:
+    driver: bridge

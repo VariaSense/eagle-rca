@@ -1,7 +1,7 @@
 # Refactoring Summary: Connector Runtime Cleanup
 
 Removed provisioning helpers and factory code from `connectors/` so it only
-contains the runtime agent. The SDK lives in `sdk/`.
+contains the runtime agent. The SDK lives in `eagle-connector-sdk/`.
 
 ## Removed
 - `connectors/api/agent_routes.py`
@@ -13,6 +13,6 @@ contains the runtime agent. The SDK lives in `sdk/`.
 
 ## Remaining
 - `connectors/docker/agent.py` (runtime agent)
-- `sdk/core/base_agent.py`
-- `sdk/core/collector.py`
-- `sdk/collectors/builtin.py`
+- `eagle-connector-sdk/core/base_agent.py`
+- `eagle-connector-sdk/core/collector.py`
+- `eagle-connector-sdk/collectors/builtin.py`

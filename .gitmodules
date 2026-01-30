@@ -1,6 +1,21 @@
-[submodule "platform"]
-	path = platform
-	url = https://github.com/VariaSense/platform.git
-[submodule "connectors"]
-	path = connectors
-	url = https://github.com/VariaSense/connectors.git
+[submodule "eagle-connectors"]
+	path = eagle-connectors
+	url = https://github.com/VariaSense/eagle-connectors.git
+[submodule "eagle-server"]
+	path = eagle-server
+	url = https://github.com/VariaSense/eagle-server.git
+[submodule "eagle-ui"]
+	path = eagle-ui
+	url = https://github.com/VariaSense/eagle-ui.git
+[submodule "eagle-connector-sdk"]
+	path = eagle-connector-sdk
+	url = https://github.com/VariaSense/eagle-connector-sdk.git
+[submodule "eagle-server-sdk"]
+	path = eagle-server-sdk
+	url = https://github.com/VariaSense/eagle-server-sdk.git
+[submodule "eagle-ui-sdk"]
+	path = eagle-ui-sdk
+	url = https://github.com/VariaSense/eagle-ui-sdk.git
+[submodule "eagle-ui-plugins"]
+	path = eagle-ui-plugins
+	url = https://github.com/VariaSense/eagle-ui-plugins.git
