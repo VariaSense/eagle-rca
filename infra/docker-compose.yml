@@ -1,4 +1,3 @@
-version: '3.8'
 name: eagle
 
 services:
@@ -96,7 +95,6 @@ services:
       FF_PROMETHEUS: "true"
       ENVIRONMENT: development
       SECRET_KEY: dev-secret-key-change-in-production
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost"
       PLUGIN_STORAGE_DIR: /app/storage/plugins
     ports:
@@ -143,7 +141,6 @@ services:
       ELASTICSEARCH_ENABLED: "true"
       ENVIRONMENT: development
       SECRET_KEY: dev-secret-key-change-in-production
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
     depends_on:
       redis:
         condition: service_healthy
@@ -222,8 +219,8 @@ services:
     image: nginx:alpine
     container_name: nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ../eagle-server/nginx-dev.conf:/etc/nginx/nginx.conf:ro
     depends_on:
