@@ -157,6 +157,39 @@ services:
     networks:
       - cluster-network
 
+  backend-beat:
+    build:
+      context: ../eagle-server
+      dockerfile: Dockerfile.backend
+    container_name: backend-beat
+    env_file:
+      - ../eagle-server/.env
+    environment:
+      DATABASE_URL: postgresql://cluster_user:cluster_password@postgres:5432/cluster_agent
+      REDIS_NODES: redis:6379
+      REDIS_PASSWORD: redis_password
+      CELERY_BROKER_URL: redis://:redis_password@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:redis_password@redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: "true"
+      ENVIRONMENT: development
+      SECRET_KEY: dev-secret-key-change-in-production
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ../eagle-server/app:/app/app
+      - ../eagle-server/requirements.txt:/app/requirements.txt
+      - ../eagle-server-sdk:/app/platform-sdk:ro
+    command: >
+      bash -c "
+        celery -A app.services.celery_tasks.celery_app beat -l info
+      "
+    networks:
+      - cluster-network
+
   # Frontend (Vite dev server)
   frontend:
     build:
